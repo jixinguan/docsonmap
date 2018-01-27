@@ -1,0 +1,171 @@
+<html>
+        <head>
+          <title>GeoServer WFS Services Map Viewer</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+          <script src="./libs/leaflet-1.2.0/leaflet.js"></script>
+    
+          
+    
+          <!-- Load Esri Leaflet from CDN.  it has no .css stylesheet of its own, only .js -->
+          <script src="./libs/esri-leaflet-v2.1.1/esri-leaflet.js"></script>
+          
+                <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+                <link rel="stylesheet" href="JixinCustomize.css" />
+                
+                <script src="./libs/jquery-3.2.1.min.js"></script>
+        </head>
+        <body>
+          <div id="titel">Load WFS into Leaflet <br />
+              Total Features loaded: <span id="total"></span>          
+          </div>
+          <div id="map"></div>
+          <script>
+            var map = L.map('map', {
+                center: [53.554121, -113.491433],
+                zoom: 10
+            });
+            L.esri.basemapLayer("Topographic").addTo(map);
+            var geojsonLayerData = new L.GeoJSON();
+
+            // load data and add change marker
+            function handleJson(data) {
+                //console.log(data);
+                console.log(BoundingBox());
+                $("#total").html(data.features.length);
+                geojsonLayerData.addData(data);
+                map.addLayer(geojsonLayerData);
+                
+                
+                /*//console.log(Object.keys(data).length);  
+                console.log(data);    
+                $("#total").html(data.features.length);
+
+                L.geoJson(data, {
+                    onEachFeature: onEachFeature,
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, geojsonMarkerOptions);
+                    }
+                }).addTo(map);
+                */
+            }
+
+            // create a CircleMarker:
+            var geojsonMarkerOptions = {
+                radius: 8,
+                fillColor: "#ff7800",
+                color: "#000",
+                weight: 1,
+                opacity: 0.5,
+                fillOpacity: 0.8
+            };
+    
+            load_wfs();
+            // listening on map movement
+            map.on('moveend', load_wfs);
+
+            function load_wfs() {
+/*                // now call wfs service to get spatial data back
+                var geoJsonUrl = 'http://172.23.37.69:8080/geoserver/ows';
+                var defaultParameters = {
+                    service: 'WFS',
+                    version: '1.1.0',
+                    request: 'getFeature',
+                    typeName: 'ogp:mappoint',
+                    maxFeatures: 3000,
+                    outputFormat: 'text/javascript',
+                    format_options: 'callback: getJson',
+                    srsName: 'EPSG:4326'
+                };
+
+                var customParams = {
+                    bbox: map.getBounds().toBBoxString()
+                };
+
+                var parameters = L.Util.extend(defaultParameters, customParams);
+                console.log(geoJsonUrl + L.Util.getParamString(parameters));
+    
+                var para = {
+                    service: 'WFS',
+                    version: '1.1.0',
+                    request: 'getFeature',
+                    typeName: 'ogp:mappoint',
+                    outputFormat: 'text/javascript',
+                    format_options: 'callback: getJson',
+                    request: 'GetFeature'
+                };
+*/
+                var xxc =$.ajax('http://172.23.37.69:8080/geoserver/ogp/ows', {
+                    //jsonp: false,
+                    //url: geoJsonUrl + L.Util.getParamString(parameters),
+                    type: 'GET',
+                    data: {
+                        service: 'WFS',
+                        version: '1.0.0',
+                        request: 'GetFeature',
+                        typeName: 'ogp:mappoint',
+                        //maxFeatures: 20,
+                        outputFormat: 'text/javascript',
+                        //srsname: 'EPSG:3857',
+                        bbox: BoundingBox, //"-113.5430145263672, 53.363665164191865, -113.44001770019531, 53.74343204185437",
+                        request: 'GetFeature'
+                    },
+                    dataType: 'jsonp',
+                    jsonpCallback:'callback:handleJson',
+                    jsonp:'format_options',
+                    success: 'successFunc'
+                });
+                console.log(xxc)
+            //} else {
+            //    alert("please zoom in, too many points.");
+            //}
+        } 
+
+        function successFunc(){
+            console.log("BoundingBox()");
+        }
+
+        function BoundingBox(){
+            var bounds = map.getBounds().getSouthWest().lng + "," +     map.getBounds().getSouthWest().lat + "," + map.getBounds().getNorthEast().lng + "," + map.getBounds().getNorthEast().lat;
+            return bounds;
+        }
+
+            /*
+            function BoundingBox(){
+                var bounds = map.getBounds().getSouthWest().lng + "," +     map.getBounds().getSouthWest().lat + "," + map.getBounds().getNorthEast().lng + "," + map.getBounds().getNorthEast().lat;
+                return bounds;
+            }
+            
+            var geoJsonUrl ="http://172.23.37.69:8080/geoserver/ows?service=WFS&version=1.1.0&request=GetFeature&typeName=ogp:mappoint&maxFeatures=3000&outputFormat=text/javascript&format_options=callback:loadGeoJson"; 
+    
+            var geojsonLayerData = new L.GeoJSON();
+    
+            function loadGeoJson(data) {
+                console.log(data);
+                geojsonLayerData.addData(data);
+            };
+    
+            $.ajax({ 
+                url: geoJsonUrl, 
+                dataType : 'jsonp',
+                success: loadGeoJson
+            });
+    
+    
+            map.on('moveend', function(){
+                if(map.getZoom() >= 18){
+                    map.removeLayer(geojsonLayerData);
+                }
+                
+                if(map.getZoom() < 18){
+                    map.addLayer(geojsonLayerData);
+                }
+    
+                console.log(map.getZoom());
+                console.log(BoundingBox());
+            });
+    */
+          </script>
+        </body>
+    </html>
+    

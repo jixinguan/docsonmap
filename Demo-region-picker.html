@@ -1,0 +1,259 @@
+<html>
+    <head>
+      <title>GeoServer WFS Services Map Viewer</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+      <script src="./libs/leaflet-1.2.0/leaflet.js"></script>
+
+      <!-- Load Esri Leaflet from CDN.  it has no .css stylesheet of its own, only .js -->
+      <script src="./libs/esri-leaflet-v2.1.1/esri-leaflet.js"></script>
+
+      <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+      <link rel="stylesheet" href="JixinCustomize.css" />
+      
+      <script src="./libs/jquery-3.2.1.min.js"></script>
+      <script src="./src/WKT.js"></script>
+      <style>#map { width: 500px; height: 700px; }
+      </style>
+    </head>
+    <body>
+
+      <div id="titel">Total Features loaded: <span id="total"></span>          
+      </div> 
+      
+      <div id="map"></div>
+      <script>
+        var baseLayerGroup = {
+            "Topographic": L.esri.basemapLayer("Topographic"),
+            "Gray": L.esri.basemapLayer("Gray"),
+            "DarkGray": L.esri.basemapLayer("DarkGray"),
+            "Imagery": L.esri.basemapLayer("Imagery"),
+            "GrayLabels": L.esri.basemapLayer("GrayLabels"),
+            "ImageryLabels": L.esri.basemapLayer("ImageryLabels"),
+        };
+  
+        var map = L.map('map', {
+          center: [53.554121, -113.491433],
+          zoom: 10,
+          layers: [baseLayerGroup.Topographic]
+        });
+
+        L.control.layers(baseLayerGroup).addTo(map);
+        load_wfs();
+
+        // load wfs layer
+        function load_wfs(){
+            // now call wfs service to get spatial data back
+            var geoJsonUrl = 'http://172.23.37.69:8080/geoserver/ogp/wfs';
+            var defaultParameters = {
+                service: 'WFS',
+                version: '2.0.0',
+                request: 'getFeature',
+                typeName: 'ogp:BF_PROV_ELECT_DIVISION_03',
+                maxFeatures: 3000,
+                outputFormat: 'text/javascript',
+                srsName: 'EPSG:4326'
+            };
+            console.log(geoJsonUrl + L.Util.getParamString(L.Util.extend(defaultParameters)));
+
+            $.ajax({
+                url: geoJsonUrl + L.Util.getParamString(L.Util.extend(defaultParameters)),
+                dataType: 'jsonp',
+                jsonp:'format_options'
+            });
+        }
+        
+        var bounds = L.latLngBounds([]);
+        var regionsLegend = L.control({
+            position: 'bottomright',
+            placeholder: 'Select Region:'
+        });
+        var divRegions = L.DomUtil.create('div', 'Regions');
+        var regions = [];
+        var selectedPolygon;
+        var geojsonLayer;
+
+        function parseResponse(data) {
+            $("#total").html(data.features.length);
+
+            //Zoom to layer            
+            L.geoJson(data, {
+                onEachFeature: onEachFeature
+            }).addTo(map);
+
+            // Create new geojson layer to hightlight the polygon
+            geojsonLayer = new L.GeoJSON(data, {
+                // Set default style
+                'style': function () {
+                    return {
+                        'color': 'yellow',
+                    }
+                }
+            //}).bindPopup(function (layer) {
+            //    return layer.feature.properties.edname;
+            }).on('click', function (e) {
+                highLight(e);
+            }).addTo(map);
+
+            // once we've looped through all the features, zoom the map to the extent of the collection
+            map.fitBounds(bounds);
+
+            //update innerHtml of divRegions
+            var str =''
+            for (var i = 0; i < regions.length; i++) {
+                str += '<option>' + regions[i] + '</option>';
+            }
+            divRegions.innerHTML = '<select id="selectRegion">' + str + '</select>';
+        }
+        
+        regionsLegend.onAdd = function (map) {
+            divRegions.innerHTML = '<select id="selectRegion"></select>';
+            divRegions.firstChild.onmousedown = divRegions.firstChild.ondblclick = L.DomEvent.stopPropagation;
+            return divRegions;
+        };
+
+        function highLight(e){
+            // Check for selected
+            if (selectedPolygon) {
+                // Reset selected to default style
+                e.target.resetStyle(selectedPolygon)
+            }
+            
+            // Assign new selected
+            selectedPolygon = e.layer;
+
+            // Bring selected to front
+            selectedPolygon.bringToFront();
+
+            // Style selected
+            selectedPolygon.setStyle({
+                'color': 'blue', //'black' //'darkblue' //'red' //'blue' //'grey'
+                /*
+                color: "#000",
+                fillColor: "#fff",
+                weight: 2,
+                opacity: 0.65
+                */              
+            })
+
+            // get WKT format spatial coverage data
+            if (selectedPolygon) {
+                //console.log(toWKT(e.layer));
+                toWKT(e.layer);
+            }
+        }
+
+        // only convert polygon for now
+        function toWKT(wfsLayer) {
+            console.log(wfsLayer.feature.properties.edname);
+            var strRet = '';
+            var coords = [];
+            if (wfsLayer instanceof L.Polygon) {
+                if (wfsLayer.feature.geometry.type == 'Polygon'){
+                    for (var i = 0; i < wfsLayer.feature.geometry.coordinates[0].length; i++) {
+	    	            coords.push(wfsLayer.feature.geometry.coordinates[0][i][1] + " " + wfsLayer.feature.geometry.coordinates[0][i][0]);
+                    };
+                } else if (wfsLayer.feature.geometry.type == 'MultiPolygon'){
+                    alert("Cannot handle MultiPolygon, please import this layer into PostGIS as simple polygon using QGIS.");
+                    return strRet
+                } else {
+                    alert("Cannot handle '" + wfsLayer.feature.geometry.type + "' type, only convert simple polygon for now.");
+                    return strRet
+                }
+            } else {
+                alert("Only convert simple polygon for now.");
+                return strRet
+            }
+
+            if (wfsLayer instanceof L.Polygon) {
+                
+                if (coords.length > 0) {
+                    for (var i = 0; i < coords.length; i++) {
+                        strRet += coords[i] + ",";
+                    };
+                    strRet = strRet.slice(0, -1);
+                    strRet = "POLYGON((" + strRet + "))";
+                }
+                return strRet;
+            }else {
+                alert("Only convert simple polygon for now.");
+                return strRet
+            }
+        }
+
+        regionsLegend.addTo(map);
+        
+        function onEachFeature(feature, layer) {
+            // get the bounds of an individual feature
+            var layerBounds = layer.getBounds();
+                
+            // extend the bounds of the collection to fit the bounds of the new feature
+            bounds.extend(layerBounds);
+
+            // Add all feature name to dropdown control
+            if (feature.properties && feature.properties.edname) {
+                regions.push(feature.properties.edname);                
+            };
+        }
+
+        // Listening on region changes, highlight the polygon, generate WKT string
+        L.DomEvent.on(divRegions, 'change', this.changeRegion, this);        
+        function changeRegion()
+        {
+            if (geojsonLayer){
+                geojsonLayer.eachLayer(function(layer){
+                    if (layer.feature.properties.edname == L.DomUtil.get('selectRegion').value) {
+                        if (selectedPolygon) {
+                            // Reset selected to default style
+                            geojsonLayer.resetStyle(selectedPolygon)
+                        }
+
+                        // Assign new selected
+                        selectedPolygon = layer;
+                        
+                        // Bring selected to front
+                        selectedPolygon.bringToFront();
+
+                        // Style selected
+                        selectedPolygon.setStyle({
+                            'color': 'blue', //'black' //'darkblue' //'red' //'blue' //'grey'
+                        });
+                        
+                        // zoom to the region
+                        map.fitBounds(layer.getBounds());
+                    }               
+                });
+            }
+        }
+        
+    </script>
+    </body>
+</html>
+
+
+
+
+
+<!-- 
+    // Add region layer from wms service
+    https://gist.github.com/alexgleith/8ff4794153c7fc0124b3
+
+    // Leaflet example select/deselect feature and give attributes of selected features 
+    https://github.com/spatialhast/leaflet.select
+
+    // Adding drop-down menu on leaflet map instead of L.control: 
+    https://gis.stackexchange.com/questions/131157/adding-drop-down-menu-on-leaflet-map-instead-of-l-control
+
+    // MultiPolygon and MultiLineString does not work in Leaflet 
+    https://github.com/arthur-e/Wicket/issues/104
+//
+var regionLayer= L.tileLayer.wms("http://172.23.37.69:8080/geoserver/ogp/wms", {
+    layers: 'ogp:BF_PROV_ELECTORAL_DIVISION',
+    format: 'image/png',
+    transparent: true
+});
+map.addLayer(wmsLayer);
+
+Interactive Choropleth Map: zoomToFeature
+http://leafletjs.com/examples/choropleth/
+-->

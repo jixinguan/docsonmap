@@ -1,0 +1,494 @@
+<html>
+        <head>
+          <title>GeoServer WFS Services Map Viewer</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+          <script src="./libs/leaflet-1.2.0/leaflet.js"></script>
+          
+          <link rel="stylesheet" type="text/css" href="./libs/leaflet-freedraw.css" />
+          <script src="./libs/leaflet-1.2.0/leaflet-src.js"></script>
+          <script src="./libs/leaflet-freedraw.web.js"></script>
+          
+          <!-- Load Esri Leaflet from CDN.  it has no .css stylesheet of its own, only .js -->
+          <script src="./libs/esri-leaflet-v2.1.1/esri-leaflet.js"></script>
+          <script src="./libs/jquery-3.2.1.min.js"></script>
+          <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+          <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    
+          <!-- user code -->
+          <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+          <link rel="stylesheet" href="./src/JixinCustomize.css" />
+          <script src="./src/DocOnMap.js"></script>
+        </head>
+        <body>
+            <div id="divContainer">
+                <div class='container'>
+                    <div class='row'>
+                        <div class='btn'>Total Features loaded: <span id="total"></span></div> 
+                        <div class='btn'>Map Layer Count: <span id="layercount"></span></div> 
+                        <div class='btn'><button onclick="ClickMe()">Click me</button></div>
+                        <div class='btn'><button onclick="listalllayersonmap()">list all layers on map</button></div>
+                        <div class='btn'><button onclick="ClearDraw()">Clear Polygon</button></div>
+                    </div>
+                </div>
+                <div class='container'>                
+                    <div class='row'>
+                        <div id="dicSearchMode" class='btn'>                
+                            <select id="dropdownSearchMode" onchange="LoadSearchMode()"> 
+                                <option value="0">Search Current Extent</option>
+                                <option value="1">Search by Region</option>
+                                <option value="2">Search by Drawing an Area</option>
+                        </select>
+                        </div>
+                        <div id="divRegion" class='btn'>                
+                            <select id="dropdownRegion" onchange="LoadRegionLayer()">  <!--Call run() function-->
+                                <option value="ogp:BF_PROV_ELECTORAL_DIVISION">Prov Electoral Division</option>
+                                <option value="ogp:BF_WILDERNESS_AREA_POLYGON">Wilderness Area</option>
+                                <option value="ogp:BF_WILDFIRE_MGMT_POLYGON">Wildfire MGMT</option>
+                                <option value="ogp:BF_TREATY_POLYGON">TREATY</option>     
+                            </select>
+                        </div>
+                        <div id="divRegionDetail" class='btn'>                
+                            <select id="dropdownRegionDetail" onchange="LoadRegionDetail()">  <!--Call run() function-->
+                            </select>
+                        </div>        
+                    <div>
+                </div>
+            </div>       
+            <section class="map" id="map"></section>
+             
+            <script>
+                'use strict';
+                const geoserverUrl = 'http://172.23.37.69:8080/geoserver';
+    
+                // prepare base layers
+                var baseLayerGroup = {
+                    "Topographic": L.esri.basemapLayer("Topographic"),
+                    "Streets": L.esri.basemapLayer("Streets"),
+                    "NationalGeographic": L.esri.basemapLayer("NationalGeographic"),
+                    "Oceans": L.esri.basemapLayer("Oceans"),
+                    "Gray": L.esri.basemapLayer("Gray"),
+                    "ShadedRelief": L.esri.basemapLayer("ShadedRelief"),
+                    "DarkGray": L.esri.basemapLayer("DarkGray"),
+                    "Imagery": L.esri.basemapLayer("Imagery"),
+                    "GrayLabels": L.esri.basemapLayer("GrayLabels"),
+                    "ImageryLabels": L.esri.basemapLayer("ImageryLabels"),
+                };
+      
+            // load map object
+            var map = L.map('map', {
+              center: [53.554121, -113.491433],
+              zoom: 10
+            });
+    
+            var baselayer = baseLayerGroup.Topographic;
+            map.addLayer(baselayer);
+    
+            L.control.layers(baseLayerGroup).addTo(map);
+        
+            var paras;
+            var docLayer;
+            var regionLayer;
+            var customLayer;
+            var selectRegion;
+            var regions = [];
+            var bounds = L.latLngBounds([]);
+            
+            paras = {
+                    workspace: "ogp",
+                    version: "2.0.0",
+                    request: "getFeature",
+                    typename: 'ogp:BF_CULTURE_POINT',
+                    layertype: '0',  //Doc layer
+                    maxfeatures: '300',
+                    outputformat: 'text/javascript',
+                    srsname: 'EPSG:4326',
+                    bbox: BoundingBox(),//'53.171472871976334,-114.0765380859375,53.93264545156641,-112.90649414062501',
+                    //cqlfilter: 'intersects(point_geom,POLYGON((53.211133 -113.807376,53.211133 -113.388068,53.818406 -113.388068,53.818406 -113.807376,53.211133 -113.807376)))',            
+            }
+            load_wfs();
+    
+            $('#dropdownSearchMode').val(0);
+            changeMode();
+    
+            // create a CircleMarker:
+            var geojsonMarkerOptions = {
+                radius: 8,
+                fillColor: "#ff7800",
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            };        
+    
+            function replaceAll(str, find, replace) {
+                var $r="";
+                while($r!=str){ 
+                    $r = str;
+                    str = str.replace(find, replace);
+                }
+                return str;
+            }
+    
+            function encodePara(para){
+                var strRet=para
+                strRet = replaceAll(strRet, ')', '%29');
+                strRet = replaceAll(strRet, ' ', '%20');
+                strRet = replaceAll(strRet, ',', '%2C');
+                strRet = replaceAll(strRet, '/', '%2F');
+                strRet = replaceAll(strRet, ':', '%3A');
+                strRet = replaceAll(strRet, '(', '%28');
+                strRet = replaceAll(strRet, ')', '%29');
+                return strRet;
+            }
+    
+            function composeUrlString() {
+                var requestUrl;
+                // check workspace
+                if (paras.workspace){
+                    requestUrl = geoserverUrl;
+                    requestUrl += '/' + encodePara(paras.workspace) + '/wfs?service=WFS';
+                } else {
+                    alert("Workspace in GeoServer must be specified.")
+                    return
+                }
+                
+                // check version
+                if (paras.version){
+                    requestUrl += '&version=' + encodePara(paras.version);
+                } else {
+                    alert("Version of WFS service must be specified.")
+                    return
+                }
+    
+                // check request
+                if (paras.request){
+                    requestUrl += '&request=' + encodePara(paras.request);
+                } else {
+                    alert("Request (getFeature, getMap... )must be specified.")
+                    return
+                }
+    
+                // check feature layer
+                if (paras.typename){
+                    requestUrl += '&typeName=' + encodePara(paras.typename);
+                } else {
+                    alert("typeName must be specified.")
+                    return
+                }
+    
+                // check maxFeatures
+                if (paras.maxfeatures){
+                    requestUrl += '&maxFeatures=' + encodePara(paras.maxfeatures);
+                } 
+    
+                // check outputFormat
+                if (paras.outputformat){
+                    requestUrl += '&outputFormat=' + encodePara(paras.outputformat);
+                } 
+    
+                // check srsName
+                if (paras.srsname){
+                    requestUrl += '&srsName=' + encodePara(paras.srsname);
+                } 
+    
+                // check bbox
+                if (paras.bbox){
+                    requestUrl += '&bbox=' + encodePara(BoundingBox());
+                } 
+    
+                // check cql_filter
+                if (paras.cqlfilter){
+                    requestUrl += '&cql_filter=' + encodePara(paras.cqlfilter);
+                    //console.log(encodePara(paras.cqlfilter));                                                
+                }             
+                return requestUrl;
+            }
+    
+            // Compose the paras object before call
+            function load_wfs() {
+                    console.log(composeUrlString())
+                    $.ajax({
+                        url: composeUrlString(),
+                        dataType: 'jsonp'
+                    });
+            } 
+    
+            // Call back function: will use the default 'parseResponse' instead of : formatOptions = '&format_options=callback:testme'
+            function parseResponse(data) {
+                $("#total").html(data.features.length);
+                $("#layercount").html(layerCount());
+                console.log(paras.layertype);
+                console.log(paras.addToMap);
+                if (paras.layertype == '0'){
+                    if (docLayer && map.hasLayer(docLayer)){
+                        map.removeLayer(docLayer);
+                    }
+                    docLayer = L.geoJson(data, {
+                        onEachFeature: onEachDocFeature,
+                        //pointToLayer: function (feature, latlng) {
+                        //    return L.circleMarker(latlng, geojsonMarkerOptions);
+                        //}
+                    });
+
+                    if (paras.addToMap){
+                        docLayer.addTo(map);
+                    }
+                    if (paras.bringToFront){
+                        docLayer.bringToFront();
+                    }
+                } else if (paras.layertype == '1') {
+                    L.geoJson(data, {
+                        onEachFeature: onEachRegionFeature
+                    });
+                    
+                    // Create new geojson layer to hightlight the polygon
+                    regionLayer = new L.GeoJSON(data, {
+                        // Set default style
+                        'style': function () {
+                            return {
+                                'color': 'yellow',
+                            }
+                        }
+                    //}).bindPopup(function (layer) {
+                    //    return layer.feature.properties.edname;
+                    }).on('click', function (e) {
+                        highLightRegion(e);
+                    }).addTo(map);
+    
+                    // once we've looped through all the features, zoom the map to the extent of the collection
+                    map.fitBounds(bounds);
+                    
+                    //update innerHtml of divRegions
+                    var divRegions = document.getElementById("dropdownRegionDetail");
+                    var str =''
+                    for (var i = 0; i < regions.length; i++) {
+                        str += '<option>' + regions[i] + '</option>';
+                    }
+                    divRegions.innerHTML = '<select id="selectRegion">' + str + '</select>';
+                } else if (paras.layertype == '2') {
+                    regionLayer = L.geoJson(data, {
+                        onEachFeature: onEachCustomFeature
+                    });
+                    
+                    if (paras.addToMap){
+                        regionLayer.addTo(map);
+                    }
+                    if (paras.bringToFront){
+                        regionLayer.bringToFront();
+                    }
+                }
+            }
+    
+            function highLightRegion(e){
+                // Check for selected
+                if (selectRegion) {
+                    // Reset selected to default style
+                    e.target.resetStyle(selectRegion)
+                }
+                
+                // Assign new selected
+                selectRegion = e.layer;
+    
+                // Bring selected to front
+                selectRegion.bringToFront();
+    
+                // Style selected
+                selectRegion.setStyle({
+                    'color': 'blue', //'black' //'darkblue' //'red' //'blue' //'grey'
+                    /*
+                    color: "#000",
+                    fillColor: "#fff",
+                    weight: 2,
+                    opacity: 0.65
+                    */              
+                })
+            }
+    
+            function onEachDocFeature(feature, layer) {
+                if (feature.properties && feature.properties.title) {
+                    layer.bindPopup(feature.properties.title);
+                }
+            }
+    
+            function onEachRegionFeature(feature, layer) {
+                if (feature.properties && feature.properties.edname) {
+                    layer.bindPopup(feature.properties.edname);
+                }
+            
+                // get the bounds of an individual feature
+                var layerBounds = layer.getBounds();
+                    
+                // extend the bounds of the collection to fit the bounds of the new feature
+                bounds.extend(layerBounds);
+    
+                
+                // Add all feature name to dropdown control
+                if (feature.properties && feature.properties.edname) {
+                    regions.push(feature.properties.edname);                
+                };
+            }
+    
+            function BoundingBox(){
+                var bounds =  map.getBounds().getSouthWest().lat + "," + map.getBounds().getSouthWest().lng + "," + map.getBounds().getNorthEast().lat + "," + map.getBounds().getNorthEast().lng;
+                return bounds;
+            }
+    
+            function LoadRegionLayer() {
+                console.log("LoadRegionLayer");
+                paras = {
+                        workspace: "ogp",
+                        version: "2.0.0",
+                        request: "getFeature",
+                        typename: document.getElementById("dropdownRegion").value,
+                        layertype: '1', // region layer
+                        maxfeatures: '300',
+                        outputformat: 'text/javascript',
+                        srsname: 'EPSG:4326',
+                        addToMap: true,
+                        bringToFront: false,
+                }
+                load_wfs();
+            }
+    
+            function LoadRegionDetail() {
+                console.log("LoadRegionDetail");
+                paras = {
+                    workspace: "ogp",
+                    version: "2.0.0",
+                    request: "getFeature",
+                    typename: "ogp:" + document.getElementById("dropdownRegionDetail").value,
+                    layertype: '1', // region layer
+                    maxfeatures: '300',
+                    outputformat: 'text/javascript',
+                    srsname: 'EPSG:4326',
+                    addToMap: true,
+                    bringToFront: false,
+                }
+                load_wfs();
+            }
+    
+            function LoadSearchMode() {
+                console.log( document.getElementById("dropdownSearchMode").value);
+                changeMode()
+            }
+    
+            function changeMode() {            
+                console.log("Layer Count: "+ layerCount())
+                if (map.hasLayer(docLayer)){
+                        map.removeLayer(docLayer); 
+                }               
+                docLayer = undefined;
+                if (map.hasLayer(regionLayer)){
+                    map.removeLayer(regionLayer); 
+                }               
+                regionLayer = undefined;
+                if (map.hasLayer(customLayer)){
+                    map.removeLayer(customLayer); 
+                }               
+                customLayer = undefined;
+                
+                if (document.getElementById("dropdownSearchMode").value == 0) {
+                    document.getElementById("dropdownRegion").disabled=true;
+    
+                    paras = {
+                        workspace: "ogp",
+                        version: "2.0.0",
+                        request: "getFeature",
+                        typename: 'ogp:BF_CULTURE_POINT',
+                        layertype: '0', //Document layer
+                        maxfeatures: '300',
+                        outputformat: 'text/javascript',
+                        srsname: 'EPSG:4326',
+                        bbox: BoundingBox(),
+                        addToMap: true,
+                        bringToFront: true,
+                    }
+                    load_wfs();
+                    // listening to map
+                    map.on('moveend', load_wfs);
+                    
+                } else if (document.getElementById("dropdownSearchMode").value == 1) {
+                    // Search by region
+                    document.getElementById("dropdownRegion").disabled=false;
+                    // stop listening on moveend event
+                    map.off("moveend", load_wfs);
+    
+                    paras = {
+                        workspace: "ogp",
+                        version: "2.0.0",
+                        request: "getFeature",
+                        typename: document.getElementById("dropdownRegion").value,
+                        layertype: '1', // region layer
+                        maxfeatures: '300',
+                        outputformat: 'text/javascript',
+                        srsname: 'EPSG:4326',
+                        addToMap: true,
+                        bringToFront: false,
+                    }
+                    load_wfs();
+                } else if (document.getElementById("dropdownSearchMode").value == 2) {
+                    // search by drawing
+                    document.getElementById("dropdownRegion").disabled=true;
+                    // stop listening on moveend event
+                    map.off("moveend", load_wfs);
+                }
+            }
+    
+            function layerCount(){
+                var iCount=0;
+                map.eachLayer(function (layer){
+                    iCount++;
+                });
+                return iCount;
+            }
+            function ClickMe(){
+            }
+      
+            function FreeDraw(){
+                // remove all layer except the base layer
+                ClearOverlayLayers();
+    
+                //const freeDraw = new FreeDraw({ mode: FreeDraw.ALL });
+                //map.addLayer(freeDraw);
+            }
+    
+            function ClearOverlayLayers(){
+                map.eachLayer(function (layer) {
+                    if (!layerHasTilePaneClass(layer)){
+                        map.removeLayer(layer);
+                    }
+                });
+            }
+    
+            function GetTileLayer(){ 
+                map.eachLayer(function (layer) {
+                    if (layerHasTilePaneClass(layer)){
+                        return layer;
+                    }
+                });
+            }
+    
+            function layerHasTilePaneClass(layer) {
+                return (' ' + layer.getPane().className + ' ').indexOf(' leaflet-tile-pane ') > -1;
+            }
+    
+            function ClearDraw(){
+                map.eachLayer(function (layer) {
+                    map.removeLayer(layer);
+                });
+            }
+    
+    
+            function listalllayersonmap(){
+                var iCount=0;
+                map.eachLayer(function (layer){
+                    iCount++;
+                    console.log(iCount + ":")
+                    console.log(layer);
+                });
+            }
+    
+      </script>
+        </body>
+    </html>

@@ -1,0 +1,147 @@
+<html>
+    <head>
+      <title>WMS Layer used!</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+        integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+        crossorigin=""/>
+      <!-- Make sure you put this AFTER Leaflet's CSS -->
+      <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+        integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+        crossorigin=""></script>
+
+      <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+      <link rel="stylesheet" href="JixinCustomize.css" />
+      <!-- style>
+        #map{ height: 600px; } 
+      </style -->
+    </head>
+    <body>
+    
+      <div id="map"></div>
+    
+      <script>
+    
+// 1. layer groups    
+var pt1 = L.marker([53.504797, -113.449253]).bindPopup('Location 1.'),
+    pt2    = L.marker([53.501883, -113.401893]).bindPopup('Location 2.'),
+    pt3    = L.marker([53.498969, -113.539688]).bindPopup('Location 3.'),
+    pt4    = L.marker([53.531500, -113.437822]).bindPopup('Ottewell.');
+var points = L.layerGroup([pt1, pt2, pt3, pt4]);
+points.setZIndex(1);
+  
+var mapboxUrl = 'https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}'
+var mapboxAttribution = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>'
+var myToken = 'pk.eyJ1Ijoiaml4aW4tZ3VhbiIsImEiOiJjajRzd2NidWowMXpkMnFwaDRmaXk0MzU3In0.1B6QeB7yLSjKo2e1-IsAgw'
+
+// 2. three base layers
+var grayscale = L.tileLayer(mapboxUrl, 
+    {
+    zIndex:1,
+    id: 'mapbox.light', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  }),
+  satellite = L.tileLayer(mapboxUrl, {
+    zIndex:2,
+    id: 'mapbox.satellite', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  }),
+  streets   = L.tileLayer(mapboxUrl, {
+    zIndex:3,
+    id: 'mapbox.streets', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  });
+        
+  // 3. initialize the map
+  var map = L.map('map', {
+        zoomSnap: 0.1,
+        center: [53.554121, -113.491433], 
+        zoom:11,
+        layers: [streets, points]
+    });      
+    
+  // 4. create two objects to contain base layers and overlayers
+  var baseMaps = {
+    "<span style='color: blue'>Grayscale</span>": grayscale,
+    "Satellite": satellite,
+    "Streets": streets
+  };
+
+  var overlayMaps = {
+    "Points": points
+  };
+
+  // 5. create layer Control to show/hide 
+  L.control.layers(baseMaps, overlayMaps).addTo(map);
+  
+  // 6. add zoom viewer
+  var ZoomViewer = L.Control.extend({
+		onAdd: function(){
+
+			var container= L.DomUtil.create('div');
+			var gauge = L.DomUtil.create('div');
+			container.style.width = '200px';
+			container.style.background = 'rgba(255,255,255,0.5)';
+			container.style.textAlign = 'left';
+			map.on('zoomstart zoom zoomend', function(ev){
+				gauge.innerHTML = 'Zoom level: ' + map.getZoom();
+			})
+			container.appendChild(gauge);
+
+			return container;
+		}
+	});
+	(new ZoomViewer).addTo(map);
+    
+  var wmsLayer2 = L.tileLayer.wms('http://172.23.37.69:8080/geoserver/wms?', {
+    layers: 'mappoint:mappoint',
+    transparent: true,
+    zIndex: 5
+  });
+  wmsLayer2.addTo(map);
+      // load a baselayer  
+//      L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+//        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+//    }).addTo(map);
+
+/*
+L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+    attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+    maxZoom: 18,
+    id: 'mapbox.streets',
+    accessToken: 'pk.eyJ1Ijoiaml4aW4tZ3VhbiIsImEiOiJjajRzd2NidWowMXpkMnFwaDRmaXk0MzU3In0.1B6QeB7yLSjKo2e1-IsAgw'
+}).addTo(map);    
+
+var marker = L.marker([53.537491, -113.501565]).addTo(map);
+
+marker.bindPopup("<b>Inside Edmonton</b><br>Inside!").openPopup();
+
+var popup = L.popup().setLatLng([53.546136, -113.485735]).setContent("View is set to Edmonton.").openOn(map);
+
+*/
+
+/*
+map.locate({setView: true, maxZoom: 16});
+
+function onLocationFound(e) {
+    var radius = e.accuracy / 2;
+
+    L.marker(e.latlng).addTo(map)
+        .bindPopup("You are within " + radius + " meters from this point").openPopup();
+
+    L.circle(e.latlng, radius).addTo(map);
+}
+map.on('locationfound', onLocationFound);
+
+function onLocationError(e) {
+    alert(e.message);
+}
+map.on('locationerror', onLocationError);
+*/
+
+      </script>
+    </body>
+    </html>

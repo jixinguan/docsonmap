@@ -1,0 +1,180 @@
+<html>
+    <head>
+      <title>GeoServer WMS API Caller</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+        integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+        crossorigin=""/>
+
+      <!-- Make sure you put this AFTER Leaflet's CSS -->
+      <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+        integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+        crossorigin=""></script>
+
+      <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+      <link rel="stylesheet" href="JixinCustomize.css" />
+      
+      <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+    </head>
+    <body>
+      <div id="titel">Load WFS into Leaflet <br />
+          Total Features loaded: <span id="total"></span>          
+      </div>
+      <div id="map"></div>
+      <script>
+        //$.noConflict();
+var mapboxUrl = 'https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}'
+var mapboxAttribution = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>'
+var myToken = 'pk.eyJ1Ijoiaml4aW4tZ3VhbiIsImEiOiJjajRzd2NidWowMXpkMnFwaDRmaXk0MzU3In0.1B6QeB7yLSjKo2e1-IsAgw'
+
+// three base layers
+var grayscale = L.tileLayer(mapboxUrl, 
+    {
+    id: 'mapbox.light', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  }),
+  satellite = L.tileLayer(mapboxUrl, {
+    id: 'mapbox.satellite', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  }),
+  streets   = L.tileLayer(mapboxUrl, {
+    id: 'mapbox.streets', 
+    attribution: mapboxAttribution,
+    accessToken: myToken
+  });
+        
+  // create a objects to contain base layers 
+  var baseMaps = {
+    "<span style='color: blue'>Grayscale</span>": grayscale,
+    "Satellite": satellite,
+    "Streets": streets
+  };
+
+  // initialize the map
+  var map = L.map('map', {
+        zoomSnap: 0.1,
+        center: [53.554121, -113.491433], 
+        minZoom: 0,
+        maxZoom: 19,
+        zoom: 11,
+        layers: [streets]
+  });
+
+  // create layer Control to show/hide 
+  L.control.layers(baseMaps).addTo(map);
+  // ==============================================================
+
+  var start_at_zoom = 8;
+
+  function onEachFeature(feature, layer) {
+    if (feature.properties && feature.properties.title) {
+      layer.bindPopup(feature.properties.title);
+    }
+  }
+
+  load_wfs();    
+  
+  // listening on map movement
+  map.on('moveend', load_wfs);
+  
+  // create a CircleMarker:
+  var geojsonMarkerOptions = {
+    radius: 8,
+    fillColor: "#ff7800",
+    olor: "#000",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.8
+  };
+
+  // load data and add change marker
+  function handleJson(data) {
+    //console.log(Object.keys(data).length);  
+    console.log(data);    
+    $("#total").html(data.features.length);
+
+    L.geoJson(data, {
+      onEachFeature: onEachFeature,
+      pointToLayer: function (feature, latlng) {
+                return L.circleMarker(latlng, geojsonMarkerOptions);
+      }
+    }).addTo(map);
+  }
+
+  function fffff(){
+    console.log("FFFFFFFFFFFFFFFFFF");
+  }
+  
+  function load_wfs() {
+    if (map.getZoom() > start_at_zoom) {
+      // now call wfs service to get spatial data back
+      var geoJsonUrl = 'http://172.23.37.69:8080/geoserver/ows';
+      var defaultParameters = {
+        service: 'WFS',
+        version: '1.1.0',
+        request: 'getFeature',
+        typeName: 'mappoint:mappoint',
+        maxFeatures: 3000,
+        outputFormat: 'text/javascript',
+        format_options: 'callback: getJson',
+        srsName: 'EPSG:4326'
+      };
+
+      var customParams = {
+        bbox: map.getBounds().toBBoxString()
+      };
+      var parameters = L.Util.extend(defaultParameters, customParams);
+      console.log(geoJsonUrl + L.Util.getParamString(parameters));
+    
+      var para = {
+        service: 'WFS',
+        version: '1.1.0',
+        request: 'getFeature',
+        typeName: 'mappoint:mappoint',
+        outputFormat: 'text/javascript',
+        format_options: 'callback: getJson',
+        //srsName: 'EPSG:4326'
+        request: 'GetFeature'
+      };
+
+      $.ajax('http://172.23.37.69:8080/geoserver/ows', {
+        //jsonp: false,
+        //url: geoJsonUrl + L.Util.getParamString(parameters),
+
+        type: 'GET',
+        data: {
+            service: 'WFS',
+            version: '1.1.0',
+            request: 'GetFeature',
+            typeName: 'mappoint:mappoint',
+            //maxFeatures: 20,
+            outputFormat: 'text/javascript',
+            //srsname: 'EPSG:4269',
+            //bbox: "-113.5430145263672, C53.363665164191865, -113.44001770019531, 53.74343204185437",
+            request: 'GetFeature'
+          },
+        dataType: 'jsonp',
+        jsonpCallback:'callback:handleJson',
+        jsonp:'format_options',
+        success: 'fffff'
+
+      });
+    } else {
+      alert("please zoom in, too many points.");
+    }
+  } 
+
+  </script>
+    </body>
+</html>
+
+
+<!-- How to add a bounding box filter to this leaflet WFS request? -->
+<!-- https://gis.stackexchange.com/questions/169129/how-to-add-a-bounding-box-filter-to-this-leaflet-wfs-request 
+http://jsfiddle.net/expedio/n5rsdhha/
+https://gis.stackexchange.com/questions/169129/how-to-add-a-bounding-box-filter-to-this-leaflet-wfs-request
+https://astuntechnology.github.io/osgis-ol3-leaflet/leaflet/05-WMS-INFO.html
+
+-->

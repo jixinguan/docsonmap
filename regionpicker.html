@@ -1,0 +1,254 @@
+<html>
+    <head>
+    <title>GeoServer WFS Services Map Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+    <script src="./libs/leaflet-1.2.0/leaflet.js"></script>
+    
+    <script src="./libs/jquery-3.2.1.min.js"></script>
+
+    <!-- user code -->
+    <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+    <link rel="stylesheet" href="regionpicker.css" />
+    </head>
+    <body>
+        <div class='container'>                
+            <div class='row'>
+                <div id="divCategory" class='dropdown'>
+                    <label for="dropdownCategory">Category:</label>                
+                    <select id="dropdownCategory" onchange=changeCategory()>
+                    </select>
+                </div>
+                <div id="divRegion" class='dropdown'>
+                    <label for="dropdownRegion">Region:</label>                      
+                    <select id="dropdownRegion" onchange="changeRegion()">  
+                    </select>
+                </div>
+                <div class='dropdown'><button onclick="ClickMe()">Click me</button></div>        
+            </div>
+        </div>
+        <div id="map"></div>
+        <script>
+        
+            const geoserverUrl = 'http://172.23.37.69:8080/geoserver';
+            var regions = [];
+            var selectedPolygonRegion;
+            var geojsonLayer;
+            var bounds = L.latLngBounds([]);
+
+            // populate Category dropdown list
+            const categoryJSON = '{"ogp:BF_PROV_ELECTORAL_DIVISION":"Prov Electoral Division","ogp:BF_WILDERNESS_AREA_POLYGON":"Wilderness Area","ogp:BF_WILDFIRE_MGMT_POLYGON":"Wildfire MGMT","ogp:BF_TREATY_POLYGON":"TREATY"}';
+            const categoryNameFieldJSON = '{"ogp:BF_PROV_ELECTORAL_DIVISION":"edname","ogp:BF_WILDERNESS_AREA_POLYGON":"wildarea_n","ogp:BF_WILDFIRE_MGMT_POLYGON":"wma_name","ogp:BF_TREATY_POLYGON":"treaty_nam"}';
+            var category = $.parseJSON(categoryJSON);
+            var selectbox = $('#dropdownCategory');
+            selectbox.empty();
+            var list = '';
+            $.each(category, function(k, v) {
+                list += "<option value='" + k + "'>" + v + "</option>";                
+            });
+            selectbox.html(list);
+
+            const LAT_LNG = [53.554121, -113.491433];
+            var baseLayer = new L.TileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');	//base layer
+
+            map = new L.Map(document.querySelector('#map')).setView(LAT_LNG, 11);
+            map.addLayer(baseLayer);
+
+            // show the regions in first category
+            document.getElementById("dropdownCategory").selectedIndex = "-1";
+            //changeCategory();
+
+
+            function changeCategory(){
+                console.log("changeCategory fired");
+                var category = $("#dropdownCategory").val();
+                if (category){
+                    load_wfs(category);
+                }                
+            }
+
+            function changeRegion(){
+                console.log("changeRegion fired");   
+                
+                if (geojsonLayer){
+                    var categoryNameField = $.parseJSON(categoryNameFieldJSON);
+                    var fieldName = categoryNameField[$("#dropdownCategory").val()];
+                    geojsonLayer.eachLayer(function(layer){
+                        if (eval("layer.feature.properties." + fieldName) == $("#dropdownRegion").val()) {
+                            if (selectedPolygonRegion) {
+                                // Reset selected to default style
+                                geojsonLayer.resetStyle(selectedPolygonRegion)
+                            }
+
+                            // Assign new selected
+                            selectedPolygonRegion = layer;
+                        
+                            // Bring selected to front
+                            selectedPolygonRegion.bringToFront();
+
+                            // Style selected
+                            selectedPolygonRegion.setStyle({
+                                'color': 'blue', //'black' //'darkblue' //'red' //'blue' //'grey'
+                            });
+                        
+                            // zoom to the region
+                            map.fitBounds(layer.getBounds());          
+                            
+                            outputString();
+                        }               
+                    });            
+                }
+            }
+            
+            // load wfs layer
+            function load_wfs(category){
+                // now call wfs service to get spatial data back
+                var geoJsonUrl = geoserverUrl + '/ogp/wfs';
+                var defaultParameters = {
+                    service: 'WFS',
+                    version: '2.0.0',
+                    request: 'getFeature',
+                    typeName: category,
+                    maxFeatures: 300,
+                    outputFormat: 'text/javascript',
+                    srsName: 'EPSG:4326'
+                };
+                console.log(geoJsonUrl + L.Util.getParamString(L.Util.extend(defaultParameters)));
+
+                $.ajax({
+                    url: geoJsonUrl + L.Util.getParamString(L.Util.extend(defaultParameters)),
+                    dataType: 'jsonp',
+                    jsonp:'format_options'
+                });
+            }
+
+            function parseResponse(data) {
+                console.log("Features: "+ data.features.length);
+
+                // remove previous loaded layer 
+                if (geojsonLayer && map.hasLayer(geojsonLayer)){
+                        map.removeLayer(geojsonLayer);
+                }
+
+                regions = [];
+                //Zoom to layer            
+                L.geoJson(data, {
+                    onEachFeature: onEachFeature
+                });
+
+                // Create new geojson layer to hightlight the polygon
+                geojsonLayer = new L.GeoJSON(data, {
+                    // Set default style
+                    'style': function () {
+                        return {
+                            'color': 'grey',
+                            'weight': 2,
+                            'fillOpacity': 0.1,
+                        }
+                    }
+
+                //}).bindPopup(function (layer) {
+                //    return layer.feature.properties.edname;
+                }).on('click', function (e) {
+                    highLight(e);
+
+                    // change region list index
+                    SelectRegion(e);
+                    // output selected region
+                    outputString();
+                }).addTo(map);
+
+                // once we've looped through all the features, zoom the map to the extent of the collection
+                map.fitBounds(bounds);
+
+                //update Regions dropdown list
+                var selectbox = $('#dropdownRegion');
+                selectbox.empty();
+                var list = '';
+                for (var i = 0; i < regions.length; i++) {
+                    //list += '<option>' + regions[i] + '</option>';
+                    list += "<option value='" + regions[i] + "'>" + regions[i] + "</option>";    
+                }
+                selectbox.html(list);
+                LogLayerCount();
+            }
+        
+            function onEachFeature(feature, layer) {
+                // get the bounds of an individual feature
+                var layerBounds = layer.getBounds();
+                
+                // extend the bounds of the collection to fit the bounds of the new feature
+                bounds.extend(layerBounds);
+
+                // Add all feature name to dropdown control
+                var categoryNameField = $.parseJSON(categoryNameFieldJSON);
+                var fieldName = categoryNameField[$("#dropdownCategory").val()];
+
+                if (feature.properties && eval("feature.properties." + categoryNameField[$("#dropdownCategory").val()])) {
+                    regions.push(eval("feature.properties." + categoryNameField[$("#dropdownCategory").val()]));   
+                    console.log(eval("feature.properties." + categoryNameField[$("#dropdownCategory").val()]));             
+                };
+            }
+
+            function highLight(e){
+                // Check for selected
+                if (selectedPolygonRegion) {
+                    // Reset selected to default style
+                    e.target.resetStyle(selectedPolygonRegion)
+                }
+            
+                // Assign new selected
+                selectedPolygonRegion = e.layer;
+
+                // Bring selected to front
+                selectedPolygonRegion.bringToFront();
+
+                // Style selected
+                selectedPolygonRegion.setStyle({
+                    'color': 'blue', //'black' //'darkblue' //'red' //'blue' //'grey'
+                    /*
+                    color: "#000",
+                    fillColor: "#fff",
+                    weight: 2,
+                    opacity: 0.65
+                    */              
+                })
+            }
+        
+            function SelectRegion(e){
+                var categoryNameField = $.parseJSON(categoryNameFieldJSON);
+                var fieldName = categoryNameField[$("#dropdownCategory").val()];               
+                console.log(eval("e.layer.feature.properties." + fieldName));
+                $('#dropdownRegion').val(eval("e.layer.feature.properties." + fieldName));
+            }
+
+            function LogLayerCount(){
+            var i=0;
+            map.eachLayer(function (layer) {
+                i++;                
+                //console.log(i+": " );
+                //console.log(layer);
+            });
+            console.log("Layers on Maper: " + i);
+        }
+
+        function outputString(){
+            console.log("Category:"+$("#dropdownCategory").val() + ",Region:"+$("#dropdownRegion").val());
+        }
+
+        function ClickMe(){
+            LogLayerCount();
+        }
+
+        map.on('click', addMarker);
+        
+        function addMarker(e){
+    // Add marker to map at click location; add popup window
+    var newMarker = new L.marker(e.latlng).addTo(map);
+}
+
+
+
+        </script>
+    </body>
+</html>

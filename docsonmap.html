@@ -1,0 +1,50 @@
+<html>
+
+<head>
+    <title>Geospatial Search</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="./libs/leaflet.css" />
+    <script src="./libs/leaflet.js"></script>
+
+    <!-- easy button lib -->
+    <link rel="stylesheet" href="./libs/easy-button.css" />
+    <script src="./libs/easy-button.js"></script>
+
+    <!-- Load Esri Leaflet from CDN.  it has no .css stylesheet of its own, only .js -->
+    <script src="./libs/esri-leaflet.js"></script>
+    <script src="./libs/jquery.js"></script>
+
+    <!-- user code -->
+    <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+    <link rel="stylesheet" href="docsonmap.css" />
+    <script src="docsonmap.js"></script>
+
+</head>
+
+<body>
+    <div class="tempdiv">
+        <select id="regions">
+        </select>
+    </div>
+    <div class="tempdiv" >Documents: <span id="total"></span></div> 
+    <div class='tempdiv'><button onclick="Test()">Test</button></div>
+    <div id="map"></div>
+
+    <script>
+
+    </script>
+</body>
+
+</html>
+
+<!-- 
+Links: 
+    EasyButton v1 Examples:
+    http://danielmontague.com/projects/easyButton.js/v1/examples/
+    https://github.com/cliffcloud/Leaflet.EasyButton
+
+    Change icon states: L.DomUtil.addClass(this.icon, 'button-state state-'....
+    https://gis.stackexchange.com/questions/245252/leaflet-map-easy-button-how-to-set-icon
+
+
+-->

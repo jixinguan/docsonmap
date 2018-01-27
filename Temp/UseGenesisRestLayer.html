@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html> 
+  <head>
+<!-- Load Leaflet from CDN -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css"
+integrity="sha512-M2wvCLH6DSRazYeZRIm1JnYyh22purTM+FDB5CsyxtQJYeKq83arPe5wgbNmcFXGqiSH2XR8dT/fJISVA1r/zQ=="
+crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"
+integrity="sha512-lInM/apFSqyy1o6s89K4iQUKg6ppXEgsVxT35HbzUupEVRh2Eu9Wdl4tHj7dZO0s1uvplcYGmt3498TtHq+log=="
+crossorigin=""></script>
+
+
+<!-- Load Esri Leaflet from CDN -->
+<script src="https://unpkg.com/esri-leaflet@2.1.1/dist/esri-leaflet.js"
+integrity="sha512-ECQqaYZke9cSdqlFG08zSkudgrdF6I1d8ViSa7I3VIszJyVqw4ng1G8sehEXlumdMnFYfzY0tMgdQa4WCs9IUw=="
+crossorigin=""></script>
+  
+<style>
+    body { margin:0; padding:0; }
+    #map { position: absolute; top:0; bottom:0; right:0; left:0; }
+  </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+    <script>
+      var map = L.map('map').setView([53.554121, -113.491433], 10);
+      alert("Done1")
+  L.esri.basemapLayer('Streets').addTo(map);
+
+      L.esri.featureLayer({
+        url: 'https://maps.alberta.ca/genesis/rest/services/GOA_Administrative_Area/Latest/MapServer/layers/1'
+      }).addTo(map);
+      alert("Done2")
+    </script>
+  </body>
+</html>

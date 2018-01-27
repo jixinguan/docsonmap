@@ -1,0 +1,428 @@
+<html>
+
+<head>
+    <title>GeoServer WFS Services Map Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+    <script src="./libs/leaflet-1.2.0/leaflet.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="./libs/leaflet-freedraw.css" />
+    <script src="./libs/leaflet-freedraw.web.js"></script>
+
+    <!-- Load Esri Leaflet from CDN.  it has no .css stylesheet of its own, only .js -->
+    <script src="./libs/esri-leaflet-v2.1.1/esri-leaflet.js"></script>
+    <script src="./libs/jquery-3.2.1.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <!-- user code -->
+    <link rel="shortcut icon" type="image/x-icon" href="./images/favicon.ico" />
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        html,
+        body,
+        #map {
+            /* height: 300px; */
+            height: 100%;
+            width: 100%;
+        }
+
+        #divContainer {
+            margin-left: 0;
+            margin-right: auto;
+            height: 800px;
+            width: 500px;
+        }
+
+        #divSearchMode {
+            position: relative;
+            top: 0;
+            right: 0;
+        }
+
+        #divRegion {
+            position: relative;
+            top: 0;
+            right: 0;
+        }
+
+        .container {
+            width: 500px;
+            border: 0;
+            padding: 4px;
+            margin: 4px;
+        }
+
+        .row {
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-block;
+            margin-right: 6px;
+            background-color: #EEE;
+        }
+
+
+        .leaflet-tile-pane {
+            z-index: 2 !important;
+        }
+
+        .leaflet-overlay-layer {
+            z-index: 1 !important;
+        }
+    </style>
+    <script src="./src/DocOnMap.js"></script>
+</head>
+
+<body>
+    <div id="divContainer">
+        <div class='container'>
+            <div class='row'>
+                <div class='btn'>Total Features loaded: <span id="total"></span></div>
+                <div class='btn'>Map Layer Count: <span id="layercount"></span></div>
+                <div class='btn'><button onclick="EnableFreeDraw()">Enable FreeDraw</button></div>
+                <div class='btn'><button onclick="DisableFreeDraw()">Disable FreeDraw</button></div>
+                <div class='btn'><button onclick="ClearPolygon()">Clear Polygon</button></div>
+                <div class='btn'><button onclick="QueryByPolygon()">Query By Polygon</button></div>
+                <div class='btn'><button onclick="freedraw()">free draw</button></div>
+            </div>
+        </div>
+        <div class='container'>
+            <div class='row'>
+                <div id="dicSearchMode" class='btn'>
+                    <select id="dropdownSearchMode" onchange="LoadSearchMode()"> 
+                              <option value="0">Search Current Extent</option>
+                              <option value="1">Search by Region</option>
+                              <option value="2">Search by Drawing an Area</option>
+                      </select>
+                </div>
+                <div id="divRegion" class='btn'>
+                    <select id="dropdownRegion" onchange="LoadRegionLayer()">  <!--Call run() function-->
+                              <option value="ogp:BF_PROV_ELECTORAL_DIVISION">Prov Electoral Division</option>
+                              <option value="ogp:BF_WILDERNESS_AREA_POLYGON">Wilderness Area</option>
+                              <option value="ogp:BF_WILDFIRE_MGMT_POLYGON">Wildfire MGMT</option>
+                              <option value="ogp:BF_TREATY_POLYGON">TREATY</option>     
+                          </select>
+                </div>
+                <div id="divRegionDetail" class='btn'>
+                    <select id="dropdownRegionDetail" onchange="LoadRegionDetail()">  <!--Call run() function-->
+                          </select>
+                </div>
+                <div>
+                </div>
+            </div>
+
+            <div id="map"></div>
+        </div>
+    </div>
+    <script>
+        const LAT_LNG = [53.554121, -113.491433];
+        const geoserverUrl = 'http://172.23.37.69:8080/geoserver';
+        var polygonLayer;
+        var markerLayer;
+        var freeDraw;
+
+        // prepare base layers
+        var baseLayerGroup = {
+            "Topographic": L.esri.basemapLayer("Topographic"),
+            "Streets": L.esri.basemapLayer("Streets"),
+            "NationalGeographic": L.esri.basemapLayer("NationalGeographic"),
+            "Oceans": L.esri.basemapLayer("Oceans"),
+            "Gray": L.esri.basemapLayer("Gray"),
+            "ShadedRelief": L.esri.basemapLayer("ShadedRelief"),
+            "DarkGray": L.esri.basemapLayer("DarkGray"),
+            "Imagery": L.esri.basemapLayer("Imagery"),
+            "GrayLabels": L.esri.basemapLayer("GrayLabels"),
+            "ImageryLabels": L.esri.basemapLayer("ImageryLabels"),
+        };
+        const baselayer = baseLayerGroup.Topographic;
+        map = new L.Map(document.querySelector('#map'), { doubleClickZoom: false }).setView(LAT_LNG, 10);
+        map.addLayer(baselayer);
+        var polygons = [];
+
+
+        /*function ResetFreeDrawLayer(){
+            map.eachLayer(function (layer) {
+              if (isTypeofLayer(layer, 'leaflet-marker-pane')){
+                  map.removeLayer(layer);
+              } else if(isPolygon(layer)){
+                  map.removeLayer(layer);
+              }
+            });
+        }*/
+        function DisplayLayersOnMap() {
+            var i = 0;
+            map.eachLayer(function (layer) {
+                i++;
+                console.log(i + ": ");
+                console.log(layer);
+            });
+        }
+
+        function isTileLayer(layer) {
+            try {
+                console.log(layer.getPane().className);
+                return (' ' + layer.getPane().className + ' ').indexOf(' leaflet-tile-pane ') > -1;
+            }
+            catch (err) {
+                console.log("return false: " + err.message);
+                //console.log(layer);
+                return false;
+            }
+        }
+
+        function isPolygon(layer) {
+            try {
+                if (layer instanceof L.Polygon) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            catch (err) {
+                console.log("isPolygon return false: " + err.message);
+                return false;
+            }
+        }
+
+        function isTypeofLayer(layer, className) {
+            try {
+                console.log(layer.getPane().className);
+                return (' ' + layer.getPane().className + ' ').indexOf(' ' + className + ' ') > -1;
+            }
+            catch (err) {
+                return false;
+            }
+        }
+
+        function ClearPolygon() {
+            // DisplayLayersOnMap();
+            console.log(freeDraw);
+            console.log(polygonLayer);
+            console.log(map.hasLayer(markerLayer));
+            if (freeDraw) {
+                freeDraw.clear();
+            }
+
+
+            console.log(polygonLayer);
+            if (polygonLayer && map.hasLayer(polygonLayer)) {
+                map.removeLayer(polygonLayer);
+            }
+            if (markerLayer && map.hasLayer(markerLayer)) {
+                map.removeLayer(markerLayer);
+            }
+            //console.log("----------------------------------------");
+            //DisplayLayersOnMap();
+        }
+
+        function getMarkers(eventData) {
+            $.each(eventData.latLngs[0], function (index, value) {
+                polygons[index] = [value.lat, value.lng];
+            });
+            DisplayLayersOnMap();
+            console.log("getMarkers");
+            //map.removeLayer(freeDraw);
+            //DisplayLayersOnMap();
+            console.log(map.getPanes());
+            $.each(map.getPanes(), function (index, value) {
+                console.log(index);
+                console.log(value);
+            });
+
+            $(".leaflet-marker-icon, .leaflet-polygon").hide();
+
+            if (map.hasLayer(freeDraw)) {
+                map.removeLayer(freeDraw);
+            }
+            freeDraw = new FreeDraw({ mode: FreeDraw });
+            map.addLayer(freeDraw);
+            //map.off('mouseup', finishFreedraw);
+            console.log("getMarkers -2");
+            
+            console.log(polygons);
+            polygonLayer = L.polygon(polygons, { color: "red", weight: 1 });
+            polygonLayer.addTo(map);
+            // zoom the map to the rectangle bounds
+            if (polygons.length>0){
+                map.fitBounds(polygons);
+            }
+        }
+
+        function EnableFreeDraw() {
+            if (freeDraw && map.hasLayer(freeDraw)) {
+                map.removeLayer(freeDraw);
+            }
+            freeDraw = new FreeDraw({ mode: FreeDraw.ALL });
+            freeDraw.on('markers', getMarkers);
+
+            map.addLayer(freeDraw);
+            DisplayLayersOnMap();
+        }
+
+        function DisableFreeDraw() {
+            if (map.hasLayer(freeDraw)) {
+                map.removeLayer(freeDraw);
+            }
+            freeDraw = new FreeDraw({ mode: FreeDraw });
+            map.addLayer(freeDraw);
+            DisplayLayersOnMap();
+        }
+
+        function ClickMe() {
+            var i = 0;
+            map.eachLayer(function (layer) {
+                i++;
+                console.log(i);
+                console.log(layer);
+            });
+
+        }
+
+        function QueryByPolygon() {
+            map.eachLayer(function (layer) {
+                if (isPolygon(layer)) {
+                    console.log(getPolygonLatLngs(layer));
+                }
+            });
+
+            console.log(polygons);
+            polygonLayer = L.polygon(polygons, { color: "red", weight: 1 });
+            polygonLayer.addTo(map);
+            // zoom the map to the rectangle bounds
+            map.fitBounds(polygons);
+        }
+
+        // only convert polygon for now
+        function getPolygonLatLngs(layer) {
+            var strRet = '';
+            var coords = [];
+            if (layer instanceof L.Polygon) {
+                var jsonObj = layer.toGeoJSON();
+                console.log(jsonObj);
+                if (jsonObj.geometry.type == 'Polygon') {
+                    for (var i = 0; i < jsonObj.geometry.coordinates[0].length; i++) {
+                        coords.push(jsonObj.geometry.coordinates[0][i][1] + " " + jsonObj.geometry.coordinates[0][i][0]);
+                    };
+                } else if (jsonObj.geometry.type == 'MultiPolygon') {
+                    alert("Cannot handle MultiPolygon, please import this layer into PostGIS as simple polygon using QGIS.");
+                    return strRet
+                } else {
+                    alert("Cannot handle '" + jsonObj.geometry.type + "' type, only convert simple polygon for now.");
+                    return strRet
+                }
+            } else {
+                alert("Only convert simple polygon for now.");
+                return strRet
+            }
+
+            if (layer instanceof L.Polygon) {
+
+                if (coords.length > 0) {
+                    for (var i = 0; i < coords.length; i++) {
+                        strRet += coords[i] + ",";
+                    };
+                    strRet = strRet.slice(0, -1);
+                    strRet = "POLYGON((" + strRet + "))";
+                }
+                return strRet;
+            } else {
+                alert("Only convert simple polygon for now.");
+                return strRet
+            }
+        }
+
+
+
+        //map.on('click', addMarker);
+
+        //function addMarker(e) {
+        //    // Add marker to map at click location; add popup window
+        //    markerLayer = new L.marker(e.latlng);
+        //     markerLayer.addTo(map);
+        //}
+
+
+
+        function freedraw() {
+            polygons = [];
+            // enable freedraw object
+            if (freeDraw && map.hasLayer(freeDraw)) {
+                map.removeLayer(freeDraw);
+            }
+            freeDraw = new FreeDraw({ 
+                mode: FreeDraw.ALL,
+                cursor: 'crosshair'
+            });
+            freeDraw.on('markers', getMarkers);
+            map.addLayer(freeDraw);
+
+            // add listener for mouse down on map
+            map.on('mouseup', finishFreedraw);
+        }
+
+        function finishFreedraw() {
+            console.log("finishFreedraw");
+            /*
+            if (freeDraw) {
+                freeDraw.clear();
+            }
+
+            if (map.hasLayer(freeDraw)) {
+                map.removeLayer(freeDraw);
+            }
+            freeDraw = new FreeDraw({ mode: FreeDraw });
+            map.addLayer(freeDraw);
+            //map.off('mouseup', finishFreedraw);
+
+            console.log(polygons);
+            polygonLayer = L.polygon(polygons, { color: "red", weight: 1 });
+            polygonLayer.addTo(map);
+            // zoom the map to the rectangle bounds
+            if (polygons.length>0){
+                map.fitBounds(polygons);
+            }
+            
+
+
+
+            if (polygonLayer && map.hasLayer(polygonLayer)) {
+                map.removeLayer(polygonLayer);
+            }
+            if (markerLayer && map.hasLayer(markerLayer)) {
+                map.remov
+            }
+
+            */
+        }
+    </script>
+</body>
+
+</html>
+
+<!--  
+        Add multiple WFS layers to Leaflet map from GeoServer using JQuery Ajax calls
+        https://gis.stackexchange.com/questions/242358/add-multiple-wfs-layers-to-leaflet-map-from-geoserver-using-jquery-ajax-calls
+    
+        Add WFS layer (JSON) in Leaflet using Leaflet layer tree control
+        https://gis.stackexchange.com/questions/189061/add-wfs-layer-json-in-leaflet-using-leaflet-layer-tree-control/189190
+    
+        about custom toolbar
+        https://github.com/Leaflet/Leaflet.draw/issues/160
+        https://github.com/Leaflet/Leaflet.draw/issues/48
+        https://github.com/Leaflet/Leaflet.draw/issues/265
+        https://wiki.documentfoundation.org/images/8/85/0401DG3-IntroducingDraw.pdf
+        https://github.com/Leaflet/Leaflet.toolbar/blob/master/examples/subtoolbar.html
+        https://github.com/leaflet/Leaflet.Toolbar/wiki/Building-custom-toolbars
+        https://github.com/leaflet/Leaflet.Toolbar/wiki/API-Reference
+        https://github.com/justinmanley/leaflet-draw-toolbar/blob/master/examples/combined.html
+        https://github.com/Leaflet/Leaflet.toolbar/blob/master/examples/minimal.html
+        https://getbounds.com/blog/a-modern-leaflet-toolbar/
+        https://github.com/stefanocudini/leaflet-search
+    
+    -->

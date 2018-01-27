@@ -1,0 +1,58 @@
+<html style="height: 100%;">
+
+<head>
+  <meta charset=utf-8 />
+  <title>Leaflet tester</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <link rel="stylesheet" href="./libs/leaflet-1.2.0/leaflet.css" />
+  <script src="./libs/jquery.js"></script>
+
+</head>
+
+<body style="height: 100%;">
+
+  <div id="btnContainer">
+    <button id="alert">clickme</button>
+    <p>show me</p>
+  </div>
+  <div id="container">
+    <ul id="list">
+      <li><a href="http://domain1.com">Item #1</a></li>
+      <li><a href="/local/path/1">Item #2</a></li>
+      <li><a href="/local/path/2">Item #3</a></li>
+      <li><a href="http://domain4.com">Item #4</a></li>
+    </ul>
+  </div>
+  <a href="http://learn.jquery.com">Learn jQuery</a>
+  <div id="map" style="height: 200px;"></div>
+  <script>
+    $(document).ready(function () {
+
+
+
+      // Attach a delegated event handler with a more refined selector
+      $("#list").on("click", "a[href^='http']", function (event) {
+        $(this).attr("target", "_blank");
+      });
+
+      $("#alert").on("click", function (event) {
+        // Add a new element on to our existing list
+        console.log("add...");
+        $("#list").append("<li><a href='http://newdomain.com'>Item #5</a></li>");
+      });
+
+      
+
+
+// This will not change the current page
+$( "#alert" ).trigger( "click" );
+
+
+
+
+    });
+  </script>
+
+</body>
+
+</html>

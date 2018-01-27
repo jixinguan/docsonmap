@@ -1,0 +1,168 @@
+parseResponse({
+    "type": "FeatureCollection",
+    "totalFeatures": 6,
+    "features": [
+        {
+            "type": "Feature",
+            "id": "mappoint.364",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.958,
+                    53.6246
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "baf17258-8a61-4017-8943-2fff2c7d86bb",
+                "title": "Muir Lake, Alberta - Bathymetry (GIS data, line features)",
+                "date_modified": "2016-03-29",
+                "type": "opendata",
+                "id": "96ad27e0-8a34-4b2e-b577-c61d557d9a55",
+                "bbox": [
+                    -113.958,
+                    53.6246,
+                    -113.958,
+                    53.6246
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "mappoint.574",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.545,
+                    53.76
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "97e88df2-f680-41bb-b8af-6d99757df3a8",
+                "title": "Water Geochemical Data, Saline Aquifer Project (tabular data, tab delimited format)",
+                "date_modified": "2016-03-29",
+                "type": "opendata",
+                "id": "3837f7f4-ee9a-4489-b2b4-b85ab815b908",
+                "bbox": [
+                    -113.545,
+                    53.76,
+                    -113.545,
+                    53.76
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "mappoint.1140",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.958,
+                    53.6246
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "2972eb98-39de-4f5c-ba26-bed1cd4ae1bf",
+                "title": "Muir Lake, Alberta - Bathymetry, Digital Elevation Model (Arc ASCII grid format)",
+                "date_modified": "2016-03-29",
+                "type": "opendata",
+                "id": "7999d996-da34-423c-b3af-810232e68839",
+                "bbox": [
+                    -113.958,
+                    53.6246,
+                    -113.958,
+                    53.6246
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "mappoint.1341",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.958,
+                    53.6246
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "02f73da5-d773-434a-8ccf-dd8bb5305e87",
+                "title": "Muir Lake, Alberta - Boundary (GIS data, polygon features)",
+                "date_modified": "2016-03-29",
+                "type": "opendata",
+                "id": "d1cc3413-d7da-4acf-ba47-da3a58e8d03f",
+                "bbox": [
+                    -113.958,
+                    53.6246,
+                    -113.958,
+                    53.6246
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "mappoint.1373",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.5903,
+                    53.5267
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "test-deleting-data-set",
+                "title": "Test deleting data set",
+                "date_modified": "2017-11-14",
+                "type": "publications",
+                "id": "a8b17664-a71c-4234-8661-8af93309d895",
+                "bbox": [
+                    -113.5903,
+                    53.5267,
+                    -113.5903,
+                    53.5267
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "id": "mappoint.1374",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -113.5903,
+                    53.5267
+                ]
+            },
+            "geometry_name": "point_geom",
+            "properties": {
+                "name": "add-open-data-001",
+                "title": "add open data 001",
+                "date_modified": "2017-11-14",
+                "type": "publications",
+                "id": "1ab229a7-d0b9-4261-8052-6395aa70ff94",
+                "bbox": [
+                    -113.5903,
+                    53.5267,
+                    -113.5903,
+                    53.5267
+                ]
+            }
+        }
+    ],
+    "crs": {
+        "type": "name",
+        "properties": {
+            "name": "urn:ogc:def:crs:EPSG::4269"
+        }
+    },
+    "bbox": [
+        -113.958,
+        53.5267,
+        -113.545,
+        53.76
+    ]
+})

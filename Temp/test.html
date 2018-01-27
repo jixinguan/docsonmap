@@ -1,0 +1,21 @@
+<html>
+        <head>
+          <title>WMS Layer used!</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+          <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+          <script>
+              $(document).ready(function(){
+                $("button").click(function(){
+                    $.get("demo_test.txt", function(bb, cc, dd){
+                        alert("Data: " + bb + "\nStatus: " + cc);
+                    });
+                });
+            });
+            </script>
+  
+        </head>
+        <body>
+          <div id="map"></div>
+          <button>Send an HTTP GET request to a page and get the result back</button>
+        </body>
+        </html>
